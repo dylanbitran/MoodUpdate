@@ -3,99 +3,116 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MoodUpdate - Portal Médico</title>
-    <!-- Librería oficial de Supabase -->
+    <title>MoodUpdate Dashboard - Verificado</title>
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root { --primary: #1a73e8; --bg: #f0f2f5; }
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: var(--bg); margin: 0; padding: 20px; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
-        .card { background: white; padding: 40px; border-radius: 12px; box-shadow: 0 8px 30px rgba(0,0,0,0.1); width: 100%; max-width: 1000px; }
+        body { font-family: 'Segoe UI', Tahoma, sans-serif; background: var(--bg); margin: 0; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
+        .card { background: white; padding: 40px; border-radius: 12px; box-shadow: 0 8px 30px rgba(0,0,0,0.1); width: 90%; max-width: 1000px; }
         #login-section { max-width: 400px; text-align: center; }
         input, button, select { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #ddd; border-radius: 6px; font-size: 16px; box-sizing: border-box; }
         button { background: var(--primary); color: white; border: none; font-weight: bold; cursor: pointer; }
-        .chart-container { height: 300px; margin-top: 20px; border: 1px solid #eee; padding: 10px; border-radius: 8px; }
+        .chart { height: 300px; margin-top: 20px; border: 1px solid #eee; padding: 10px; border-radius: 8px; }
+        #debug-log { background: #333; color: #0f0; padding: 10px; font-family: monospace; font-size: 12px; border-radius: 4px; margin-top: 20px; text-align: left; max-height: 100px; overflow-y: auto; }
     </style>
 </head>
 <body>
 
 <div id="login-section" class="card">
     <h1>MoodUpdate</h1>
-    <p>Inicie sesión para acceder a los datos médicos</p>
+    <p>Acceso Médico Autorizado</p>
     <form id="loginForm">
         <input type="email" id="email" placeholder="Email" required value="dylanbitran@gmail.com">
         <input type="password" id="password" placeholder="Contraseña" required>
-        <button type="submit" id="btn">Entrar</button>
+        <button type="submit" id="btn">Entrar al Sistema</button>
     </form>
     <p id="msg" style="color:red; font-size:14px; margin-top:10px;"></p>
+    <div id="debug-log">Iniciando sistema de diagnóstico...</div>
 </div>
 
 <div id="dashboard-section" class="card" style="display:none;">
-    <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid #f0f2f5; padding-bottom:10px; margin-bottom:20px;">
+    <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid #f0f2f5; margin-bottom:20px;">
         <h2>Panel de Monitoreo</h2>
         <button onclick="location.reload()" style="width:auto; background:#666; padding:5px 15px;">Cerrar Sesión</button>
     </div>
     <div style="display:flex; gap:10px;">
         <input type="text" id="uid" placeholder="Pegue el UID del paciente aquí...">
-        <button onclick="load()" style="width:auto; padding:0 20px;">Cargar Datos</button>
+        <button onclick="load()" style="width:auto; padding:0 20px;">Cargar Reportes</button>
     </div>
-    <div class="chart-container"><canvas id="c1"></canvas></div>
-    <div class="chart-container"><canvas id="c2"></canvas></div>
+    <div class="chart"><canvas id="c1"></canvas></div>
+    <div class="chart"><canvas id="c2"></canvas></div>
 </div>
 
 <script>
     const URL = 'https://jalnvorosccaqaedttec.supabase.co';
     const KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImphbG52b3Jvc2NjYXFhZWR0dGVjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg0MTU4MzIsImV4cCI6MjA4Mzk5MTgzMn0.Haqj2olzs5QmbE7DZyXIj4yhHdhaTi8DPAkka-mYK6g';
-    
     let supabase;
-    
-    // Inicialización al cargar la página
+
+    function log(m) {
+        const d = document.getElementById('debug-log');
+        d.innerHTML += "<br>> " + m;
+        console.log(m);
+    }
+
     window.onload = () => {
         try {
             supabase = window.supabase.createClient(URL, KEY);
-            console.log("Conexión con Supabase establecida");
+            log("Librería cargada. Esperando login...");
         } catch (e) {
-            document.getElementById('msg').innerText = "Error cargando motor de base de datos.";
+            log("ERROR: No se pudo iniciar Supabase.");
         }
     };
 
     document.getElementById('loginForm').onsubmit = async (e) => {
         e.preventDefault();
         const btn = document.getElementById('btn');
-        btn.disabled = true;
-        btn.innerText = "Verificando...";
-
         const email = document.getElementById('email').value;
-        const password = document.getElementById('password').value;
+        const pass = document.getElementById('password').value;
 
-        const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+        btn.disabled = true;
+        btn.innerText = "Verificando JWT...";
+        log("Intentando autenticar con Supabase Auth...");
 
-        if (error) {
-            document.getElementById('msg').innerText = "Error: " + error.message;
+        try {
+            const { data, error } = await supabase.auth.signInWithPassword({ email, password: pass });
+
+            if (error) {
+                log("FALLO: " + error.message);
+                document.getElementById('msg').innerText = "Acceso Denegado: " + error.message;
+                btn.disabled = false;
+                btn.innerText = "Entrar al Sistema";
+            } else if (data.user) {
+                log("ÉXITO: JWT recibido. Cargando Dashboard...");
+                document.getElementById('login-section').style.display = 'none';
+                document.getElementById('dashboard-section').style.display = 'block';
+            }
+        } catch (err) {
+            log("ERROR DE RED: " + err.message);
             btn.disabled = false;
-            btn.innerText = "Entrar";
-        } else {
-            document.getElementById('login-section').style.display = 'none';
-            document.getElementById('dashboard-section').style.display = 'block';
+            btn.innerText = "Entrar al Sistema";
         }
     };
 
     async function load() {
         const id = document.getElementById('uid').value;
-        const { data: steps } = await supabase.from('steps').select('*').eq('patient_id', id).order('timestamp');
-        const { data: sleep } = await supabase.from('sleep_sessions').select('*').eq('patient_id', id).order('start_time');
+        log("Consultando datos para UID: " + id);
+        const { data: st } = await supabase.from('steps').select('*').eq('patient_id', id).order('timestamp');
+        const { data: sl } = await supabase.from('sleep_sessions').select('*').eq('patient_id', id).order('start_time');
+        
+        log("Datos recibidos. Renderizando gráficos...");
         
         new Chart(document.getElementById('c1'), { type:'line', data: {
-            labels: (steps||[]).map(d => new Date(d.timestamp).getHours()+":00"),
-            datasets: [{label:'Pasos', data:(steps||[]).map(d=>d.count), borderColor:'#1a73e8'}]
+            labels: (st||[]).map(d => new Date(d.timestamp).getHours()+":00"),
+            datasets: [{label:'Pasos', data:(st||[]).map(d=>d.count), borderColor:'#1a73e8', tension:0.4}]
         }});
 
         const toH = (iso) => new Date(iso).getHours() + (new Date(iso).getMinutes()/60);
         new Chart(document.getElementById('c2'), { type:'line', data: {
-            labels: (sleep||[]).map(d => new Date(d.start_time).toLocaleDateString()),
+            labels: (sl||[]).map(d => new Date(d.start_time).toLocaleDateString()),
             datasets: [
-                {label:'Inicio', data:(sleep||[]).map(d=>toH(d.start_time)), borderColor:'#34a853'},
-                {label:'Fin', data:(sleep||[]).map(d=>toH(d.end_time)), borderColor:'#ea4335'}
+                {label:'Inicio', data:(sl||[]).map(d=>toH(d.start_time)), borderColor:'#34a853'},
+                {label:'Fin', data:(sl||[]).map(d=>toH(d.end_time)), borderColor:'#ea4335'}
             ]
         }, options: { scales: { y: { min:0, max:24 }}}});
     }
