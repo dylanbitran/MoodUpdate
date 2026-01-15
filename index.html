@@ -3,118 +3,138 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MoodUpdate Dashboard - Verificado</title>
-    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <title>MoodUpdate Dashboard - Monitoreo Clínico</title>
+    <!-- Librerías oficiales estables -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        :root { --primary: #1a73e8; --bg: #f0f2f5; }
-        body { font-family: 'Segoe UI', Tahoma, sans-serif; background: var(--bg); margin: 0; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
-        .card { background: white; padding: 40px; border-radius: 12px; box-shadow: 0 8px 30px rgba(0,0,0,0.1); width: 90%; max-width: 1000px; }
-        #login-section { max-width: 400px; text-align: center; }
-        input, button, select { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #ddd; border-radius: 6px; font-size: 16px; box-sizing: border-box; }
-        button { background: var(--primary); color: white; border: none; font-weight: bold; cursor: pointer; }
-        .chart { height: 300px; margin-top: 20px; border: 1px solid #eee; padding: 10px; border-radius: 8px; }
-        #debug-log { background: #333; color: #0f0; padding: 10px; font-family: monospace; font-size: 12px; border-radius: 4px; margin-top: 20px; text-align: left; max-height: 100px; overflow-y: auto; }
+        :root { --primary: #1a73e8; --bg: #f8fafc; --text: #1e293b; }
+        body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 20px; display: flex; justify-content: center; align-items: flex-start; min-height: 100vh; }
+        .card { background: white; padding: 40px; border-radius: 16px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); width: 95%; max-width: 1100px; margin-top: 20px; }
+        h1 { color: var(--primary); margin-top: 0; font-size: 24px; }
+        input, button, select { padding: 12px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 16px; box-sizing: border-box; }
+        button { background: var(--primary); color: white; border: none; font-weight: 600; cursor: pointer; transition: 0.2s; }
+        button:hover { background: #1557b0; }
+        .chart-box { height: 350px; margin-bottom: 30px; border: 1px solid #e2e8f0; border-radius: 12px; padding: 15px; background: #fff; }
+        .controls-row { display: flex; gap: 15px; align-items: flex-end; margin-bottom: 25px; background: #f8fafc; padding: 20px; border-radius: 12px; border: 1px solid #e2e8f0; }
+        label { display: block; margin-bottom: 8px; font-weight: 600; font-size: 14px; color: #64748b; }
+        #debug-log { background: #1e293b; color: #34d399; padding: 15px; font-family: 'Consolas', monospace; font-size: 12px; border-radius: 8px; margin-top: 20px; max-height: 100px; overflow-y: auto; line-height: 1.5; }
     </style>
 </head>
 <body>
 
-<div id="login-section" class="card">
-    <h1>MoodUpdate</h1>
-    <p>Acceso Médico Autorizado</p>
-    <form id="loginForm">
-        <input type="email" id="email" placeholder="Email" required value="dylanbitran@gmail.com">
-        <input type="password" id="password" placeholder="Contraseña" required>
-        <button type="submit" id="btn">Entrar al Sistema</button>
-    </form>
-    <p id="msg" style="color:red; font-size:14px; margin-top:10px;"></p>
-    <div id="debug-log">Iniciando sistema de diagnóstico...</div>
-</div>
+<div class="card">
+    <div style="border-bottom: 2px solid #f1f5f9; margin-bottom: 25px; padding-bottom: 10px;">
+        <h1>MoodUpdate: Portal del Psiquiatra</h1>
+        <p>Visualización directa de actividad y sueño (Modo MVP)</p>
+    </div>
 
-<div id="dashboard-section" class="card" style="display:none;">
-    <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid #f0f2f5; margin-bottom:20px;">
-        <h2>Panel de Monitoreo</h2>
-        <button onclick="location.reload()" style="width:auto; background:#666; padding:5px 15px;">Cerrar Sesión</button>
+    <div class="controls-row">
+        <div style="flex-grow: 1;">
+            <label>Seleccionar Paciente (UID):</label>
+            <select id="patientList" style="width: 100%;" onchange="document.getElementById('manualUid').value = this.value">
+                <option value="">Cargando lista...</option>
+            </select>
+        </div>
+        <div style="flex-grow: 1;">
+            <label>Ingresar UID Manual:</label>
+            <input type="text" id="manualUid" placeholder="Pegue el UID aquí..." style="width: 100%;">
+        </div>
+        <button onclick="loadData()" style="min-width: 180px;">Generar Reportes</button>
     </div>
-    <div style="display:flex; gap:10px;">
-        <input type="text" id="uid" placeholder="Pegue el UID del paciente aquí...">
-        <button onclick="load()" style="width:auto; padding:0 20px;">Cargar Reportes</button>
-    </div>
-    <div class="chart"><canvas id="c1"></canvas></div>
-    <div class="chart"><canvas id="c2"></canvas></div>
+
+    <div class="chart-box"><canvas id="stepsChart"></canvas></div>
+    <div class="chart-box"><canvas id="sleepChart"></canvas></div>
+    
+    <div id="debug-log">Iniciando conexión con el servidor de datos...</div>
 </div>
 
 <script>
     const URL = 'https://jalnvorosccaqaedttec.supabase.co';
     const KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImphbG52b3Jvc2NjYXFhZWR0dGVjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg0MTU4MzIsImV4cCI6MjA4Mzk5MTgzMn0.Haqj2olzs5QmbE7DZyXIj4yhHdhaTi8DPAkka-mYK6g';
-    let supabase;
+    let supabaseClient;
 
     function log(m) {
-        const d = document.getElementById('debug-log');
-        d.innerHTML += "<br>> " + m;
-        console.log(m);
+        const div = document.getElementById('debug-log');
+        div.innerHTML += "<br>[" + new Date().toLocaleTimeString() + "] > " + m;
+        div.scrollTop = div.scrollHeight;
     }
 
-    window.onload = () => {
+    window.onload = async () => {
         try {
-            supabase = window.supabase.createClient(URL, KEY);
-            log("Librería cargada. Esperando login...");
+            supabaseClient = supabase.createClient(URL, KEY);
+            log("Conexión exitosa con Supabase.");
+            await fetchPatients();
         } catch (e) {
-            log("ERROR: No se pudo iniciar Supabase.");
+            log("ERROR CRÍTICO: No se pudo inicializar el cliente.");
         }
     };
 
-    document.getElementById('loginForm').onsubmit = async (e) => {
-        e.preventDefault();
-        const btn = document.getElementById('btn');
-        const email = document.getElementById('email').value;
-        const pass = document.getElementById('password').value;
-
-        btn.disabled = true;
-        btn.innerText = "Verificando JWT...";
-        log("Intentando autenticar con Supabase Auth...");
-
-        try {
-            const { data, error } = await supabase.auth.signInWithPassword({ email, password: pass });
-
-            if (error) {
-                log("FALLO: " + error.message);
-                document.getElementById('msg').innerText = "Acceso Denegado: " + error.message;
-                btn.disabled = false;
-                btn.innerText = "Entrar al Sistema";
-            } else if (data.user) {
-                log("ÉXITO: JWT recibido. Cargando Dashboard...");
-                document.getElementById('login-section').style.display = 'none';
-                document.getElementById('dashboard-section').style.display = 'block';
-            }
-        } catch (err) {
-            log("ERROR DE RED: " + err.message);
-            btn.disabled = false;
-            btn.innerText = "Entrar al Sistema";
+    async function fetchPatients() {
+        log("Buscando pacientes en la base de datos...");
+        const { data, error } = await supabaseClient.from('steps').select('patient_id');
+        
+        if (error) {
+            log("ERROR de lectura: " + error.message + ". Verifica las políticas RLS.");
+            return;
         }
-    };
 
-    async function load() {
-        const id = document.getElementById('uid').value;
-        log("Consultando datos para UID: " + id);
-        const { data: st } = await supabase.from('steps').select('*').eq('patient_id', id).order('timestamp');
-        const { data: sl } = await supabase.from('sleep_sessions').select('*').eq('patient_id', id).order('start_time');
-        
-        log("Datos recibidos. Renderizando gráficos...");
-        
-        new Chart(document.getElementById('c1'), { type:'line', data: {
-            labels: (st||[]).map(d => new Date(d.timestamp).getHours()+":00"),
-            datasets: [{label:'Pasos', data:(st||[]).map(d=>d.count), borderColor:'#1a73e8', tension:0.4}]
-        }});
+        if (data && data.length > 0) {
+            const uniqueIds = [...new Set(data.map(d => d.patient_id))];
+            const select = document.getElementById('patientList');
+            select.innerHTML = '<option value="">Seleccione...</option>' + 
+                             uniqueIds.map(id => `<option value="${id}">${id}</option>`).join('');
+            log("Se encontraron " + uniqueIds.length + " pacientes.");
+        } else {
+            log("No se encontraron registros previos. Asegúrese de que la App móvil haya sincronizado.");
+            document.getElementById('patientList').innerHTML = '<option value="">Sin datos</option>';
+        }
+    }
 
+    async function loadData() {
+        const uid = document.getElementById('manualUid').value.trim();
+        if (!uid) { alert("Por favor, ingrese o seleccione un UID"); return; }
+        
+        log("Cargando reportes para paciente: " + uid);
+        const [stRes, slRes] = await Promise.all([
+            supabaseClient.from('steps').select('*').eq('patient_id', uid).order('timestamp', { ascending: true }),
+            supabaseClient.from('sleep_sessions').select('*').eq('patient_id', uid).order('start_time', { ascending: true })
+        ]);
+
+        renderSteps(stRes.data || []);
+        renderSleep(slRes.data || []);
+        log("Gráficos actualizados con " + (stRes.data?.length || 0) + " registros de pasos.");
+    }
+
+    let sChart, slChart;
+    function renderSteps(data) {
+        const ctx = document.getElementById('stepsChart').getContext('2d');
+        if (sChart) sChart.destroy();
+        sChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: data.map(d => new Date(d.timestamp).getHours() + ":00"),
+                datasets: [{ label: 'Pasos por hora', data: data.map(d => d.count), borderColor: '#1a73e8', backgroundColor: 'rgba(26, 115, 232, 0.1)', fill: true, tension: 0.4 }]
+            },
+            options: { responsive: true, maintainAspectRatio: false }
+        });
+    }
+
+    function renderSleep(data) {
+        const ctx = document.getElementById('sleepChart').getContext('2d');
+        if (slChart) slChart.destroy();
         const toH = (iso) => new Date(iso).getHours() + (new Date(iso).getMinutes()/60);
-        new Chart(document.getElementById('c2'), { type:'line', data: {
-            labels: (sl||[]).map(d => new Date(d.start_time).toLocaleDateString()),
-            datasets: [
-                {label:'Inicio', data:(sl||[]).map(d=>toH(d.start_time)), borderColor:'#34a853'},
-                {label:'Fin', data:(sl||[]).map(d=>toH(d.end_time)), borderColor:'#ea4335'}
-            ]
-        }, options: { scales: { y: { min:0, max:24 }}}});
+        slChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: data.map(d => new Date(d.start_time).toLocaleDateString()),
+                datasets: [
+                    { label: 'Inicio', data: data.map(d => toH(d.start_time)), borderColor: '#34a853', backgroundColor: '#34a853' },
+                    { label: 'Fin', data: data.map(d => toH(d.end_time)), borderColor: '#ea4335', backgroundColor: '#ea4335' }
+                ]
+            },
+            options: { responsive: true, maintainAspectRatio: false, scales: { y: { min: 0, max: 24 } } }
+        });
     }
 </script>
 </body>
