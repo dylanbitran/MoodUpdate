@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MoodUpdate - Portal Médico Seguro</title>
+    <!-- Librerías externas -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
@@ -24,19 +25,19 @@
 </head>
 <body>
 
-<!-- SECCIÓN 1: LOGIN (PROTECCIÓN JWT) -->
+<!-- SECCIÓN 1: LOGIN -->
 <div id="login-section" class="card">
     <h1 style="color:var(--primary)">MoodUpdate</h1>
     <p>Acceso exclusivo para psiquiatras</p>
-    <form id="loginForm" onsubmit="event.preventDefault(); handleLogin();">
-        <input type="email" id="email" placeholder="Correo electrónico" required>
+    <form id="loginForm">
+        <input type="email" id="email" placeholder="Correo electrónico" required value="dylanbitran@gmail.com">
         <input type="password" id="password" placeholder="Contraseña" required>
         <button type="submit" id="loginBtn">Iniciar Sesión</button>
     </form>
     <p id="login-msg" style="color:red; font-size:14px; margin-top: 15px;"></p>
 </div>
 
-<!-- SECCIÓN 2: DASHBOARD (VISUALIZACIÓN) -->
+<!-- SECCIÓN 2: DASHBOARD -->
 <div id="dashboard-section" class="card">
     <div class="nav">
         <h2>Panel de Monitoreo Médico</h2>
@@ -47,7 +48,7 @@
         <div>
             <label>Pacientes Recientes:</label>
             <select id="patientList" onchange="document.getElementById('manualUid').value = this.value">
-                <option value="">Cargando lista...</option>
+                <option value="">Cargando...</option>
             </select>
         </div>
         <div>
@@ -65,12 +66,24 @@
     const URL = 'https://jalnvorosccaqaedttec.supabase.co';
     const KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImphbG52b3Jvc2NjYXFhZWR0dGVjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg0MTU4MzIsImV4cCI6MjA4Mzk5MTgzMn0.Haqj2olzs5QmbE7DZyXIj4yhHdhaTi8DPAkka-mYK6g';
     
-    // Inicialización robusta del cliente
-    const supabaseClient = window.supabase.createClient(URL, KEY);
+    let supabaseClient;
+    try {
+        // Inicialización usando el objeto global 'supabase'
+        supabaseClient = window.supabase.createClient(URL, KEY);
+        console.log("Supabase cargado correctamente.");
+    } catch (e) {
+        console.error("Error al cargar Supabase:", e);
+        document.getElementById('login-msg').innerText = "Error crítico: No se pudo conectar con la librería de seguridad.";
+    }
 
     let sChart, slChart;
 
-    // --- AUTENTICACIÓN ---
+    // Manejar el formulario de login
+    document.getElementById('loginForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        await handleLogin();
+    });
+
     async function handleLogin() {
         const email = document.getElementById('email').value;
         const password = document.getElementById('password').value;
@@ -81,17 +94,23 @@
         btn.innerText = "Entrando...";
         msg.innerText = "";
 
+        console.log("Intentando login para:", email);
+
         try {
-            const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
+            const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
+            
             if (error) {
+                console.error("Error de login:", error);
                 msg.innerText = "Error: " + error.message;
                 btn.disabled = false;
                 btn.innerText = "Iniciar Sesión";
             } else {
+                console.log("Login exitoso:", data);
                 showDashboard();
             }
         } catch (e) {
-            msg.innerText = "Error de conexión con el servidor.";
+            console.error("Excepción en login:", e);
+            msg.innerText = "Error inesperado de red.";
             btn.disabled = false;
             btn.innerText = "Iniciar Sesión";
         }
@@ -108,7 +127,6 @@
         fetchPatients();
     }
 
-    // --- CARGA DE DATOS ---
     async function fetchPatients() {
         const { data } = await supabaseClient.from('steps').select('patient_id');
         if (data) {
