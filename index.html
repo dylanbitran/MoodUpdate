@@ -15,6 +15,7 @@
         input, button, select { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 16px; box-sizing: border-box; }
         button { background: var(--primary); color: white; border: none; font-weight: 600; cursor: pointer; transition: 0.2s; }
         button:hover { background: #1557b0; }
+        button:disabled { background: #ccc; cursor: not-allowed; }
         .chart-box { height: 300px; margin-bottom: 20px; border: 1px solid #e2e8f0; border-radius: 12px; padding: 15px; }
         .nav { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #f1f5f9; margin-bottom: 20px; }
         .controls-grid { display: grid; grid-template-columns: 1fr 1fr auto; gap: 15px; align-items: flex-end; margin-bottom: 25px; background: #f8fafc; padding: 20px; border-radius: 12px; }
@@ -27,10 +28,12 @@
 <div id="login-section" class="card">
     <h1 style="color:var(--primary)">MoodUpdate</h1>
     <p>Acceso exclusivo para psiquiatras</p>
-    <input type="email" id="email" placeholder="Correo electrónico">
-    <input type="password" id="password" placeholder="Contraseña">
-    <button onclick="handleLogin()">Iniciar Sesión</button>
-    <p id="login-msg" style="color:red; font-size:14px;"></p>
+    <form id="loginForm" onsubmit="event.preventDefault(); handleLogin();">
+        <input type="email" id="email" placeholder="Correo electrónico" required>
+        <input type="password" id="password" placeholder="Contraseña" required>
+        <button type="submit" id="loginBtn">Iniciar Sesión</button>
+    </form>
+    <p id="login-msg" style="color:red; font-size:14px; margin-top: 15px;"></p>
 </div>
 
 <!-- SECCIÓN 2: DASHBOARD (VISUALIZACIÓN) -->
@@ -43,12 +46,12 @@
     <div class="controls-grid">
         <div>
             <label>Pacientes Recientes:</label>
-            <select id="patientList" onchange="syncInput(this.value)">
+            <select id="patientList" onchange="document.getElementById('manualUid').value = this.value">
                 <option value="">Cargando lista...</option>
             </select>
         </div>
         <div>
-            <label>O ingresar UID Manual:</label>
+            <label>Ingresar UID Manual:</label>
             <input type="text" id="manualUid" placeholder="Pegue el UID aquí..." style="margin:0">
         </div>
         <button onclick="loadData()" style="padding: 12px 24px;">Ver Reportes</button>
@@ -61,7 +64,9 @@
 <script>
     const URL = 'https://jalnvorosccaqaedttec.supabase.co';
     const KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImphbG52b3Jvc2NjYXFhZWR0dGVjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg0MTU4MzIsImV4cCI6MjA4Mzk5MTgzMn0.Haqj2olzs5QmbE7DZyXIj4yhHdhaTi8DPAkka-mYK6g';
-    const supabaseClient = supabase.createClient(URL, KEY);
+    
+    // Inicialización robusta del cliente
+    const supabaseClient = window.supabase.createClient(URL, KEY);
 
     let sChart, slChart;
 
@@ -69,9 +74,27 @@
     async function handleLogin() {
         const email = document.getElementById('email').value;
         const password = document.getElementById('password').value;
-        const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
-        if (error) { document.getElementById('login-msg').innerText = "Error: " + error.message; }
-        else { showDashboard(); }
+        const btn = document.getElementById('loginBtn');
+        const msg = document.getElementById('login-msg');
+
+        btn.disabled = true;
+        btn.innerText = "Entrando...";
+        msg.innerText = "";
+
+        try {
+            const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
+            if (error) {
+                msg.innerText = "Error: " + error.message;
+                btn.disabled = false;
+                btn.innerText = "Iniciar Sesión";
+            } else {
+                showDashboard();
+            }
+        } catch (e) {
+            msg.innerText = "Error de conexión con el servidor.";
+            btn.disabled = false;
+            btn.innerText = "Iniciar Sesión";
+        }
     }
 
     async function handleLogout() {
@@ -91,16 +114,14 @@
         if (data) {
             const unique = [...new Set(data.map(d => d.patient_id))];
             const select = document.getElementById('patientList');
-            select.innerHTML = '<option value="">Seleccione o escriba manual...</option>' + 
+            select.innerHTML = '<option value="">Seleccione un paciente...</option>' + 
                              unique.map(id => `<option value="${id}">${id}</option>`).join('');
         }
     }
 
-    function syncInput(val) { document.getElementById('manualUid').value = val; }
-
     async function loadData() {
         const uid = document.getElementById('manualUid').value.trim();
-        if (!uid) { alert("Ingrese un UID de paciente"); return; }
+        if (!uid) { alert("Por favor, ingrese un UID de paciente"); return; }
 
         const [stepsRes, sleepRes] = await Promise.all([
             supabaseClient.from('steps').select('*').eq('patient_id', uid).order('timestamp'),
@@ -112,19 +133,20 @@
     }
 
     function drawSteps(data) {
-        const ctx = document.getElementById('stepsChart');
+        const ctx = document.getElementById('stepsChart').getContext('2d');
         if (sChart) sChart.destroy();
         sChart = new Chart(ctx, {
             type: 'line',
             data: {
                 labels: data.map(d => new Date(d.timestamp).getHours() + ":00"),
-                datasets: [{ label: 'Actividad (Pasos)', data: data.map(d => d.count), borderColor: '#1a73e8', tension: 0.4, fill: true, backgroundColor: 'rgba(26,115,232,0.1)' }]
-            }
+                datasets: [{ label: 'Pasos', data: data.map(d => d.count), borderColor: '#1a73e8', tension: 0.4, fill: true, backgroundColor: 'rgba(26,115,232,0.1)' }]
+            },
+            options: { responsive: true, maintainAspectRatio: false }
         });
     }
 
     function drawSleep(data) {
-        const ctx = document.getElementById('sleepChart');
+        const ctx = document.getElementById('sleepChart').getContext('2d');
         if (slChart) slChart.destroy();
         const toH = (iso) => new Date(iso).getHours() + (new Date(iso).getMinutes()/60);
         slChart = new Chart(ctx, {
@@ -132,15 +154,15 @@
             data: {
                 labels: data.map(d => new Date(d.start_time).toLocaleDateString()),
                 datasets: [
-                    { label: 'Inicio', data: data.map(d => toH(d.start_time)), borderColor: '#34a853' },
-                    { label: 'Fin', data: data.map(d => toH(d.end_time)), borderColor: '#ea4335' }
+                    { label: 'Inicio', data: data.map(d => toH(d.start_time)), borderColor: '#34a853', backgroundColor: '#34a853' },
+                    { label: 'Fin', data: data.map(d => toH(d.end_time)), borderColor: '#ea4335', backgroundColor: '#ea4335' }
                 ]
             },
-            options: { scales: { y: { min: 0, max: 24 } } }
+            options: { responsive: true, maintainAspectRatio: false, scales: { y: { min: 0, max: 24 } } }
         });
     }
 
-    // Persistencia de sesión
+    // Mantener sesión abierta si refresca
     supabaseClient.auth.getSession().then(({ data: { session } }) => {
         if (session) showDashboard();
     });
