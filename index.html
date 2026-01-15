@@ -3,56 +3,54 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MoodUpdate - Portal Médico Seguro</title>
-    <!-- Cargamos Supabase primero -->
+    <title>MoodUpdate - Portal Médico</title>
+    <!-- Librería oficial estable -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root { --primary: #1a73e8; --bg: #f0f2f5; --text: #1e293b; }
-        body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 20px; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
+        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); margin: 0; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
         .card { background: white; padding: 40px; border-radius: 16px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); width: 90%; max-width: 1000px; }
-        #login-section { max-width: 400px; text-align: center; display: block; }
+        #login-section { max-width: 400px; text-align: center; }
         #dashboard-section { display: none; width: 100%; }
         input, button, select { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 16px; box-sizing: border-box; }
-        button { background: var(--primary); color: white; border: none; font-weight: 600; cursor: pointer; transition: 0.2s; }
+        button { background: var(--primary); color: white; border: none; font-weight: 600; cursor: pointer; }
         button:hover { background: #1557b0; }
-        button:disabled { background: #ccc; cursor: not-allowed; }
-        .chart-box { height: 300px; margin-bottom: 20px; border: 1px solid #e2e8f0; border-radius: 12px; padding: 15px; }
+        button:disabled { background: #ccc; cursor: wait; }
+        .chart-box { height: 350px; margin-bottom: 20px; border: 1px solid #e2e8f0; border-radius: 12px; padding: 15px; }
         .nav { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #f1f5f9; margin-bottom: 20px; }
-        .controls-grid { display: grid; grid-template-columns: 1fr 1fr auto; gap: 15px; align-items: flex-end; margin-bottom: 25px; background: #f8fafc; padding: 20px; border-radius: 12px; }
-        label { font-size: 12px; font-weight: bold; color: #64748b; display: block; margin-bottom: 5px; }
     </style>
 </head>
 <body>
 
+<!-- SECCIÓN LOGIN -->
 <div id="login-section" class="card">
-    <h1 style="color:var(--primary)">MoodUpdate</h1>
-    <p>Acceso exclusivo para psiquiatras</p>
+    <h1>MoodUpdate</h1>
+    <p>Portal Médico Seguro</p>
     <form id="loginForm">
-        <input type="email" id="email" placeholder="Correo electrónico" required value="dylanbitran@gmail.com">
+        <input type="email" id="email" placeholder="Correo electrónico" required>
         <input type="password" id="password" placeholder="Contraseña" required>
         <button type="submit" id="loginBtn">Iniciar Sesión</button>
     </form>
-    <p id="login-msg" style="color:red; font-size:14px; margin-top: 15px;"></p>
+    <p id="error-msg" style="color:red; font-size:14px; margin-top:15px;"></p>
 </div>
 
+<!-- SECCIÓN DASHBOARD -->
 <div id="dashboard-section" class="card">
     <div class="nav">
-        <h2>Panel Médico</h2>
-        <button onclick="handleLogout()" style="width: auto; background: #64748b; padding: 8px 16px;">Salir</button>
+        <h2>Panel de Monitoreo</h2>
+        <button onclick="logout()" style="width:auto; background:#64748b; padding:8px 16px;">Cerrar Sesión</button>
     </div>
-    <div class="controls-grid">
+    <div style="display:grid; grid-template-columns: 1fr 1fr auto; gap:15px; align-items:end; margin-bottom:20px;">
         <div>
-            <label>Pacientes:</label>
-            <select id="patientList" onchange="document.getElementById('manualUid').value = this.value">
-                <option value="">Cargando...</option>
-            </select>
+            <label style="font-size:12px; color:#64748b; font-weight:bold;">Pacientes Recientes:</label>
+            <select id="patientList"><option value="">Cargando...</option></select>
         </div>
         <div>
-            <label>UID Manual:</label>
-            <input type="text" id="manualUid" placeholder="Pegue UID..." style="margin:0">
+            <label style="font-size:12px; color:#64748b; font-weight:bold;">Ingresar UID Manual:</label>
+            <input type="text" id="manualUid" style="margin:0">
         </div>
-        <button onclick="loadData()">Ver Reportes</button>
+        <button onclick="loadData()" id="refreshBtn" style="padding:12px 20px;">Actualizar</button>
     </div>
     <div class="chart-box"><canvas id="stepsChart"></canvas></div>
     <div class="chart-box"><canvas id="sleepChart"></canvas></div>
@@ -62,42 +60,40 @@
     const URL = 'https://jalnvorosccaqaedttec.supabase.co';
     const KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImphbG52b3Jvc2NjYXFhZWR0dGVjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg0MTU4MzIsImV4cCI6MjA4Mzk5MTgzMn0.Haqj2olzs5QmbE7DZyXIj4yhHdhaTi8DPAkka-mYK6g';
     
-    let supabaseClient;
+    let supabase;
+    try {
+        supabase = window.supabase.createClient(URL, KEY);
+    } catch (e) {
+        document.getElementById('error-msg').innerText = "Error cargando la librería de seguridad.";
+    }
 
-    // Inicialización segura
-    window.onload = function() {
-        if (typeof supabase === 'undefined') {
-            document.getElementById('login-msg').innerText = "Error: No se pudo cargar la librería de Supabase. Revisa tu internet.";
-            document.getElementById('loginBtn').disabled = true;
-        } else {
-            supabaseClient = supabase.createClient(URL, KEY);
-            console.log("Supabase inicializado.");
-            // Verificar sesión existente
-            supabaseClient.auth.getSession().then(({ data: { session } }) => {
-                if (session) showDashboard();
-            });
-        }
-    };
+    const loginForm = document.getElementById('loginForm');
+    const loginBtn = document.getElementById('loginBtn');
+    const errorMsg = document.getElementById('error-msg');
 
-    document.getElementById('loginForm').onsubmit = async (e) => {
+    loginForm.onsubmit = async (e) => {
         e.preventDefault();
-        const email = document.getElementById('email').value;
-        const password = document.getElementById('password').value;
-        const btn = document.getElementById('loginBtn');
-        const msg = document.getElementById('login-msg');
+        loginBtn.disabled = true;
+        loginBtn.innerText = "Verificando...";
+        errorMsg.innerText = "";
 
-        btn.disabled = true;
-        btn.innerText = "Conectando...";
-        msg.innerText = "";
-
-        const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
-        
-        if (error) {
-            msg.innerText = "Error: " + error.message;
-            btn.disabled = false;
-            btn.innerText = "Iniciar Sesión";
-        } else {
-            showDashboard();
+        try {
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            
+            const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+            
+            if (error) {
+                errorMsg.innerText = "Error: " + error.message;
+                loginBtn.disabled = false;
+                loginBtn.innerText = "Iniciar Sesión";
+            } else {
+                showDashboard();
+            }
+        } catch (err) {
+            errorMsg.innerText = "Error de conexión con el servidor.";
+            loginBtn.disabled = false;
+            loginBtn.innerText = "Iniciar Sesión";
         }
     };
 
@@ -107,50 +103,68 @@
         fetchPatients();
     }
 
-    async function handleLogout() {
-        await supabaseClient.auth.signOut();
+    async function logout() {
+        await supabase.auth.signOut();
         location.reload();
     }
 
     async function fetchPatients() {
-        const { data } = await supabaseClient.from('steps').select('patient_id');
+        const { data } = await supabase.from('steps').select('patient_id');
         if (data) {
-            const unique = [...new Set(data.map(d => d.patient_id))];
-            document.getElementById('patientList').innerHTML = '<option value="">Seleccione...</option>' + 
-                unique.map(id => `<option value="${id}">${id}</option>`).join('');
+            const ids = [...new Set(data.map(d => d.patient_id))];
+            const select = document.getElementById('patientList');
+            select.innerHTML = '<option value="">Seleccione...</option>' + 
+                             ids.map(id => `<option value="${id}">${id}</option>`).join('');
         }
     }
 
     async function loadData() {
-        const uid = document.getElementById('manualUid').value.trim();
-        if (!uid) return alert("Ingrese UID");
+        const uid = document.getElementById('manualUid').value || document.getElementById('patientList').value;
+        if (!uid) return alert("Ingrese un UID");
+
+        const btn = document.getElementById('refreshBtn');
+        btn.disabled = true;
+        btn.innerText = "Cargando...";
+
         const [st, sl] = await Promise.all([
-            supabaseClient.from('steps').select('*').eq('patient_id', uid).order('timestamp'),
-            supabaseClient.from('sleep_sessions').select('*').eq('patient_id', uid).order('start_time')
+            supabase.from('steps').select('*').eq('patient_id', uid).order('timestamp'),
+            supabase.from('sleep_sessions').select('*').eq('patient_id', uid).order('start_time')
         ]);
-        drawSteps(st.data || []);
-        drawSleep(sl.data || []);
+
+        renderSteps(st.data || []);
+        renderSleep(sl.data || []);
+        
+        btn.disabled = false;
+        btn.innerText = "Actualizar";
     }
 
-    function drawSteps(data) {
+    let sChart, slChart;
+    function renderSteps(data) {
         const ctx = document.getElementById('stepsChart');
-        new Chart(ctx, { type: 'line', data: {
+        if (sChart) sChart.destroy();
+        sChart = new Chart(ctx, { type: 'line', data: {
             labels: data.map(d => new Date(d.timestamp).getHours() + ":00"),
-            datasets: [{ label: 'Pasos', data: data.map(d => d.count), borderColor: '#1a73e8' }]
-        }});
+            datasets: [{ label: 'Pasos', data: data.map(d => d.count), borderColor: '#1a73e8', tension: 0.4, fill: true, backgroundColor: 'rgba(26,115,232,0.1)' }]
+        }, options: { responsive: true, maintainAspectRatio: false }});
     }
 
-    function drawSleep(data) {
+    function renderSleep(data) {
         const ctx = document.getElementById('sleepChart');
+        if (slChart) slChart.destroy();
         const toH = (iso) => new Date(iso).getHours() + (new Date(iso).getMinutes()/60);
-        new Chart(ctx, { type: 'line', data: {
+        slChart = new Chart(ctx, { type: 'line', data: {
             labels: data.map(d => new Date(d.start_time).toLocaleDateString()),
             datasets: [
                 { label: 'Inicio', data: data.map(d => toH(d.start_time)), borderColor: '#34a853' },
                 { label: 'Fin', data: data.map(d => toH(d.end_time)), borderColor: '#ea4335' }
             ]
-        }, options: { scales: { y: { min: 0, max: 24 }}}});
+        }, options: { responsive: true, maintainAspectRatio: false, scales: { y: { min: 0, max: 24 }}}});
     }
+
+    // Verificar sesión previa
+    supabase.auth.getSession().then(({ data: { session } }) => {
+        if (session) showDashboard();
+    });
 </script>
 </body>
 </html>
