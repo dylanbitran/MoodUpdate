@@ -10,32 +10,41 @@ Aplicación nativa que actúa como recolector de datos en el teléfono del pacie
 *   **Sincronización en Segundo Plano:** Los datos se suben automáticamente a la base de datos sin requerir intervención del usuario.
 *   **Privacidad y Seguridad:** Manejo seguro de información de salud.
 *   **Gestión de Identidad:** Generación de un UID único que el paciente puede compartir con su doctor.
-*   **Indicador de Estado:** Visualización clara del estado de conexión y sincronización.
 
 ### 2. Base de Datos (Supabase / PostgreSQL)
 Almacenamiento seguro y escalable alojado en Supabase.
 *   **Estructura de Pasos:** Registro del total de pasos realizados cada hora.
-*   **Estructura de Sueño:** Registro detallado de sesiones de sueño, incluyendo hora de inicio, hora de fin, duración y cantidad de eventos en las últimas 24 horas.
-*   **Seguridad RLS:** Políticas de seguridad a nivel de fila (Row Level Security) para proteger los datos.
+*   **Estructura de Sueño:** Registro detallado de sesiones de sueño (inicio, fin y duración).
+*   **Seguridad RLS:** Políticas de acceso diferenciadas para App (escritura) y Doctor (lectura).
 
 ### 3. Panel Web (Dashboard Médico)
-Página web técnica, liviana y fácil de usar para el psiquiatra.
-*   **Acceso Seguro:** Sistema de autenticación para garantizar la privacidad de los pacientes.
-*   **Gestión de Pacientes:** Lista interactiva de pacientes vinculados al psiquiatra.
-*   **Visualización de Datos:** 
-    *   **Gráfico de Actividad:** Pasos realizados por hora.
-    *   **Gráfico de Sueño:** Representación continua de los periodos de descanso (inicio/fin) y su duración.
-    *   **Filtros Temporales:** Visualización por día, semana o mes con gráficos suavizados y coordinados.
+Página web para el psiquiatra con visualización de datos en tiempo real.
+*   **Acceso Directo (MVP):** Visualización mediante UID del paciente.
+*   **Gráficos Dinámicos:** Implementación con Chart.js para tendencias de actividad y sueño.
 
-## Requisitos Técnicos
-*   **Android:** SDK 34+ (Compilado con SDK 36 para compatibilidad con librerías modernas).
-*   **Backend:** Supabase (Auth, PostgreSQL, Edge Functions).
-*   **Frontend Web:** HTML5, CSS3, JavaScript (Supabase-js, Chart.js).
+---
 
-## Instalación y Configuración
-1.  **Configuración de Supabase:** Ejecutar los scripts SQL proporcionados para crear las tablas `steps` y `sleep_sessions`.
-2.  **Configuración de la App:** Actualizar las credenciales en `SupabaseManager.kt`.
-3.  **Despliegue Web:** Subir el dashboard a Supabase Edge Functions para acceso remoto seguro.
+## 🚀 Hoja de Ruta (Planes Futuros)
+
+### 1. Análisis de Prosodia
+*   Implementar un módulo de análisis de voz para detectar biomarcadores digitales en el habla (velocidad, tono, pausas).
+*   Utilizar estos datos como predictores de fases maníacas o depresivas.
+
+### 2. Recuperación Histórica (Backfill)
+*   Aprovechar la capacidad de Health Connect para extraer datos de los últimos 30 días.
+*   Permitir que la App llene automáticamente las tablas de Supabase con el historial previo al momento de la instalación.
+
+### 3. Persistencia y Robustez
+*   Implementar una "memoria de sincronización" para que la app recuerde la última vez que subió datos exitosamente.
+*   Asegurar que no haya pérdida de información si el teléfono permanece apagado por varios días.
+
+### 4. Seguridad Avanzada
+*   Restablecer el sistema de autenticación JWT para el psiquiatra.
+*   Implementar encriptación de datos sensibles de extremo a extremo.
+
+### 5. Nuevas Variables Clínicas
+*   Integración de Ritmo Cardíaco y Variabilidad de la Frecuencia Cardíaca (HRV).
+*   Registro manual de estado de ánimo diario (Mood Journaling).
 
 ---
 *Este proyecto busca mejorar la calidad de vida de los pacientes mediante el uso de tecnología para un monitoreo clínico más preciso.*
