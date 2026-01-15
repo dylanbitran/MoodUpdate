@@ -50,8 +50,10 @@
 </div>
 
 <script>
-    const URL = 'https://jalnvorosccaqaedttec.supabase.co';
-    const KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImphbG52b3Jvc2NjYXFhZWR0dGVjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg0MTU4MzIsImV4cCI6MjA4Mzk5MTgzMn0.Haqj2olzs5QmbE7DZyXIj4yhHdhaTi8DPAkka-mYK6g';
+    // CREDENCIALES LIMPIAS (Sin caracteres invisibles)
+    const SB_URL = "https://jalnvorosccaqaedttec.supabase.co";
+    const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImphbG52b3Jvc2NjYXFhZWR0dGVjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg0MTU4MzIsImV4cCI6MjA4Mzk5MTgzMn0.Haqj2olzs5QmbE7DZyXIj4yhHdhaTi8DPAkka-mYK6g";
+    
     let supabaseClient;
 
     function log(m) {
@@ -60,17 +62,17 @@
         div.scrollTop = div.scrollHeight;
     }
 
-    // Inicialización Robusta
     window.onload = async () => {
         log("Verificando librerías...");
         
         if (typeof window.supabase === 'undefined') {
-            log("FALLO: La librería de Supabase no se detecta en el navegador.");
+            log("FALLO: Librería no detectada.");
             return;
         }
 
         try {
-            supabaseClient = window.supabase.createClient(URL, KEY);
+            // Inicialización con variables limpias
+            supabaseClient = window.supabase.createClient(SB_URL, SB_KEY);
             log("Conexión establecida con Supabase.");
             await fetchPatients();
         } catch (e) {
@@ -94,7 +96,7 @@
                              uniqueIds.map(id => `<option value="${id}">${id}</option>`).join('');
             log("ÉXITO: Se encontraron " + uniqueIds.length + " pacientes.");
         } else {
-            log("AVISO: No hay registros en la base de datos aún.");
+            log("AVISO: No hay registros aún.");
         }
     }
 
@@ -116,7 +118,7 @@
 
             renderSteps(stRes.data || []);
             renderSleep(slRes.data || []);
-            log("Gráficos actualizados con " + (stRes.data?.length || 0) + " puntos.");
+            log("Gráficos actualizados.");
         } catch (e) {
             log("Error al cargar reportes: " + e.message);
         } finally {
