@@ -4,13 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MoodUpdate - Portal Médico</title>
-    <!-- Librería estable -->
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- Cargamos Supabase con versión fija para evitar errores de red -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.47.10/dist/umd/supabase.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root { --primary: #1a73e8; --bg: #f0f2f5; }
         body { font-family: 'Segoe UI', sans-serif; background: var(--bg); margin: 0; padding: 20px; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
-        .card { background: white; padding: 40px; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); width: 100%; max-width: 900px; }
+        .card { background: white; padding: 40px; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); width: 90%; max-width: 900px; }
         #login-section { max-width: 400px; text-align: center; }
         #dashboard-section { display: none; }
         input, button, select { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #ddd; border-radius: 8px; font-size: 16px; box-sizing: border-box; }
@@ -21,7 +21,6 @@
 </head>
 <body>
 
-<!-- LOGIN -->
 <div id="login-section" class="card">
     <h1>MoodUpdate</h1>
     <p>Portal Médico Seguro</p>
@@ -31,15 +30,14 @@
     <p id="msg" style="color:red; font-size:14px;"></p>
 </div>
 
-<!-- DASHBOARD -->
 <div id="dashboard-section" class="card">
     <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #eee; margin-bottom:20px;">
         <h2>Panel Médico</h2>
         <button onclick="location.reload()" style="width:auto; padding:5px 15px; background:#666;">Salir</button>
     </div>
     <div style="display:grid; grid-template-columns: 1fr auto; gap:10px; margin-bottom:20px;">
-        <input type="text" id="manualUid" placeholder="Pegue el UID del paciente aquí...">
-        <button onclick="loadData()" style="width:auto; padding:0 20px;">Cargar Datos</button>
+        <input type="text" id="manualUid" placeholder="Pegue el UID del paciente...">
+        <button onclick="loadData()" style="width:auto; padding:0 20px;">Ver Gráficos</button>
     </div>
     <div class="chart-box"><canvas id="stepsChart"></canvas></div>
     <div class="chart-box"><canvas id="sleepChart"></canvas></div>
@@ -51,15 +49,18 @@
     
     let supabaseClient;
 
-    // Inicializar al cargar
-    window.onload = () => {
-        try {
-            supabaseClient = supabase.createClient(URL, KEY);
-            console.log("Supabase listo");
-        } catch (e) {
-            document.getElementById('msg').innerText = "Error cargando sistema de seguridad.";
+    // Inicialización inmediata
+    try {
+        if (typeof window.supabase === 'undefined') {
+            document.getElementById('msg').innerText = "Cargando componentes de seguridad... espera 3 segundos.";
+            setTimeout(() => { location.reload(); }, 3000);
+        } else {
+            supabaseClient = window.supabase.createClient(URL, KEY);
+            console.log("Sistema listo");
         }
-    };
+    } catch (e) {
+        document.getElementById('msg').innerText = "Error al iniciar el motor de seguridad.";
+    }
 
     async function handleLogin() {
         const email = document.getElementById('email').value;
@@ -67,24 +68,21 @@
         const btn = document.getElementById('loginBtn');
         const msg = document.getElementById('msg');
 
+        if (!supabaseClient) return;
+
         btn.disabled = true;
         btn.innerText = "Verificando...";
         msg.innerText = "";
 
-        try {
-            const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
-            if (error) {
-                msg.innerText = "Error: " + error.message;
-                btn.disabled = false;
-                btn.innerText = "Iniciar Sesión";
-            } else {
-                document.getElementById('login-section').style.display = 'none';
-                document.getElementById('dashboard-section').style.display = 'block';
-            }
-        } catch (e) {
-            msg.innerText = "Fallo de conexión.";
+        const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
+        
+        if (error) {
+            msg.innerText = "Acceso Denegado: " + error.message;
             btn.disabled = false;
             btn.innerText = "Iniciar Sesión";
+        } else {
+            document.getElementById('login-section').style.display = 'none';
+            document.getElementById('dashboard-section').style.display = 'block';
         }
     }
 
