@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MoodUpdate Dashboard - Monitoreo Clínico</title>
-    <!-- Librerías oficiales estables -->
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- Librería oficial estable -->
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root { --primary: #1a73e8; --bg: #f8fafc; --text: #1e293b; }
@@ -40,13 +40,13 @@
             <label>Ingresar UID Manual:</label>
             <input type="text" id="manualUid" placeholder="Pegue el UID aquí..." style="width: 100%;">
         </div>
-        <button onclick="loadData()" style="min-width: 180px;">Generar Reportes</button>
+        <button onclick="loadData()" id="btnSync" style="min-width: 180px;">Generar Reportes</button>
     </div>
 
     <div class="chart-box"><canvas id="stepsChart"></canvas></div>
     <div class="chart-box"><canvas id="sleepChart"></canvas></div>
     
-    <div id="debug-log">Iniciando conexión con el servidor de datos...</div>
+    <div id="debug-log">Iniciando sistema de diagnóstico...</div>
 </div>
 
 <script>
@@ -56,26 +56,34 @@
 
     function log(m) {
         const div = document.getElementById('debug-log');
-        div.innerHTML += "<br>[" + new Date().toLocaleTimeString() + "] > " + m;
+        div.innerHTML += "<br>> " + m;
         div.scrollTop = div.scrollHeight;
     }
 
+    // Inicialización Robusta
     window.onload = async () => {
+        log("Verificando librerías...");
+        
+        if (typeof window.supabase === 'undefined') {
+            log("FALLO: La librería de Supabase no se detecta en el navegador.");
+            return;
+        }
+
         try {
-            supabaseClient = supabase.createClient(URL, KEY);
-            log("Conexión exitosa con Supabase.");
+            supabaseClient = window.supabase.createClient(URL, KEY);
+            log("Conexión establecida con Supabase.");
             await fetchPatients();
         } catch (e) {
-            log("ERROR CRÍTICO: No se pudo inicializar el cliente.");
+            log("ERROR CRÍTICO: " + e.message);
         }
     };
 
     async function fetchPatients() {
-        log("Buscando pacientes en la base de datos...");
+        log("Consultando lista de pacientes...");
         const { data, error } = await supabaseClient.from('steps').select('patient_id');
         
         if (error) {
-            log("ERROR de lectura: " + error.message + ". Verifica las políticas RLS.");
+            log("ERROR de base de datos: " + error.message);
             return;
         }
 
@@ -84,26 +92,37 @@
             const select = document.getElementById('patientList');
             select.innerHTML = '<option value="">Seleccione...</option>' + 
                              uniqueIds.map(id => `<option value="${id}">${id}</option>`).join('');
-            log("Se encontraron " + uniqueIds.length + " pacientes.");
+            log("ÉXITO: Se encontraron " + uniqueIds.length + " pacientes.");
         } else {
-            log("No se encontraron registros previos. Asegúrese de que la App móvil haya sincronizado.");
-            document.getElementById('patientList').innerHTML = '<option value="">Sin datos</option>';
+            log("AVISO: No hay registros en la base de datos aún.");
         }
     }
 
     async function loadData() {
         const uid = document.getElementById('manualUid').value.trim();
-        if (!uid) { alert("Por favor, ingrese o seleccione un UID"); return; }
+        if (!uid) { alert("Por favor, ingrese un UID"); return; }
         
-        log("Cargando reportes para paciente: " + uid);
-        const [stRes, slRes] = await Promise.all([
-            supabaseClient.from('steps').select('*').eq('patient_id', uid).order('timestamp', { ascending: true }),
-            supabaseClient.from('sleep_sessions').select('*').eq('patient_id', uid).order('start_time', { ascending: true })
-        ]);
+        const btn = document.getElementById('btnSync');
+        btn.innerText = "Cargando...";
+        btn.disabled = true;
 
-        renderSteps(stRes.data || []);
-        renderSleep(slRes.data || []);
-        log("Gráficos actualizados con " + (stRes.data?.length || 0) + " registros de pasos.");
+        log("Cargando datos para el UID: " + uid);
+        
+        try {
+            const [stRes, slRes] = await Promise.all([
+                supabaseClient.from('steps').select('*').eq('patient_id', uid).order('timestamp', { ascending: true }),
+                supabaseClient.from('sleep_sessions').select('*').eq('patient_id', uid).order('start_time', { ascending: true })
+            ]);
+
+            renderSteps(stRes.data || []);
+            renderSleep(slRes.data || []);
+            log("Gráficos actualizados con " + (stRes.data?.length || 0) + " puntos.");
+        } catch (e) {
+            log("Error al cargar reportes: " + e.message);
+        } finally {
+            btn.innerText = "Generar Reportes";
+            btn.disabled = false;
+        }
     }
 
     let sChart, slChart;
