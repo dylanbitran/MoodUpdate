@@ -4,12 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MoodUpdate - Portal Médico Seguro</title>
-    <!-- Librerías externas -->
+    <!-- Cargamos Supabase primero -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root { --primary: #1a73e8; --bg: #f0f2f5; --text: #1e293b; }
-        body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); margin: 0; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
+        body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 20px; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
         .card { background: white; padding: 40px; border-radius: 16px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); width: 90%; max-width: 1000px; }
         #login-section { max-width: 400px; text-align: center; display: block; }
         #dashboard-section { display: none; width: 100%; }
@@ -25,7 +25,6 @@
 </head>
 <body>
 
-<!-- SECCIÓN 1: LOGIN -->
 <div id="login-section" class="card">
     <h1 style="color:var(--primary)">MoodUpdate</h1>
     <p>Acceso exclusivo para psiquiatras</p>
@@ -37,27 +36,24 @@
     <p id="login-msg" style="color:red; font-size:14px; margin-top: 15px;"></p>
 </div>
 
-<!-- SECCIÓN 2: DASHBOARD -->
 <div id="dashboard-section" class="card">
     <div class="nav">
-        <h2>Panel de Monitoreo Médico</h2>
-        <button onclick="handleLogout()" style="width: auto; background: #64748b; padding: 8px 16px;">Cerrar Sesión</button>
+        <h2>Panel Médico</h2>
+        <button onclick="handleLogout()" style="width: auto; background: #64748b; padding: 8px 16px;">Salir</button>
     </div>
-
     <div class="controls-grid">
         <div>
-            <label>Pacientes Recientes:</label>
+            <label>Pacientes:</label>
             <select id="patientList" onchange="document.getElementById('manualUid').value = this.value">
                 <option value="">Cargando...</option>
             </select>
         </div>
         <div>
-            <label>Ingresar UID Manual:</label>
-            <input type="text" id="manualUid" placeholder="Pegue el UID aquí..." style="margin:0">
+            <label>UID Manual:</label>
+            <input type="text" id="manualUid" placeholder="Pegue UID..." style="margin:0">
         </div>
-        <button onclick="loadData()" style="padding: 12px 24px;">Ver Reportes</button>
+        <button onclick="loadData()">Ver Reportes</button>
     </div>
-
     <div class="chart-box"><canvas id="stepsChart"></canvas></div>
     <div class="chart-box"><canvas id="sleepChart"></canvas></div>
 </div>
@@ -67,59 +63,43 @@
     const KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImphbG52b3Jvc2NjYXFhZWR0dGVjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg0MTU4MzIsImV4cCI6MjA4Mzk5MTgzMn0.Haqj2olzs5QmbE7DZyXIj4yhHdhaTi8DPAkka-mYK6g';
     
     let supabaseClient;
-    try {
-        // Inicialización usando el objeto global 'supabase'
-        supabaseClient = window.supabase.createClient(URL, KEY);
-        console.log("Supabase cargado correctamente.");
-    } catch (e) {
-        console.error("Error al cargar Supabase:", e);
-        document.getElementById('login-msg').innerText = "Error crítico: No se pudo conectar con la librería de seguridad.";
-    }
 
-    let sChart, slChart;
+    // Inicialización segura
+    window.onload = function() {
+        if (typeof supabase === 'undefined') {
+            document.getElementById('login-msg').innerText = "Error: No se pudo cargar la librería de Supabase. Revisa tu internet.";
+            document.getElementById('loginBtn').disabled = true;
+        } else {
+            supabaseClient = supabase.createClient(URL, KEY);
+            console.log("Supabase inicializado.");
+            // Verificar sesión existente
+            supabaseClient.auth.getSession().then(({ data: { session } }) => {
+                if (session) showDashboard();
+            });
+        }
+    };
 
-    // Manejar el formulario de login
-    document.getElementById('loginForm').addEventListener('submit', async (e) => {
+    document.getElementById('loginForm').onsubmit = async (e) => {
         e.preventDefault();
-        await handleLogin();
-    });
-
-    async function handleLogin() {
         const email = document.getElementById('email').value;
         const password = document.getElementById('password').value;
         const btn = document.getElementById('loginBtn');
         const msg = document.getElementById('login-msg');
 
         btn.disabled = true;
-        btn.innerText = "Entrando...";
+        btn.innerText = "Conectando...";
         msg.innerText = "";
 
-        console.log("Intentando login para:", email);
-
-        try {
-            const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
-            
-            if (error) {
-                console.error("Error de login:", error);
-                msg.innerText = "Error: " + error.message;
-                btn.disabled = false;
-                btn.innerText = "Iniciar Sesión";
-            } else {
-                console.log("Login exitoso:", data);
-                showDashboard();
-            }
-        } catch (e) {
-            console.error("Excepción en login:", e);
-            msg.innerText = "Error inesperado de red.";
+        const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
+        
+        if (error) {
+            msg.innerText = "Error: " + error.message;
             btn.disabled = false;
             btn.innerText = "Iniciar Sesión";
+        } else {
+            showDashboard();
         }
-    }
-
-    async function handleLogout() {
-        await supabaseClient.auth.signOut();
-        location.reload();
-    }
+    };
 
     function showDashboard() {
         document.getElementById('login-section').style.display = 'none';
@@ -127,63 +107,50 @@
         fetchPatients();
     }
 
+    async function handleLogout() {
+        await supabaseClient.auth.signOut();
+        location.reload();
+    }
+
     async function fetchPatients() {
         const { data } = await supabaseClient.from('steps').select('patient_id');
         if (data) {
             const unique = [...new Set(data.map(d => d.patient_id))];
-            const select = document.getElementById('patientList');
-            select.innerHTML = '<option value="">Seleccione un paciente...</option>' + 
-                             unique.map(id => `<option value="${id}">${id}</option>`).join('');
+            document.getElementById('patientList').innerHTML = '<option value="">Seleccione...</option>' + 
+                unique.map(id => `<option value="${id}">${id}</option>`).join('');
         }
     }
 
     async function loadData() {
         const uid = document.getElementById('manualUid').value.trim();
-        if (!uid) { alert("Por favor, ingrese un UID de paciente"); return; }
-
-        const [stepsRes, sleepRes] = await Promise.all([
+        if (!uid) return alert("Ingrese UID");
+        const [st, sl] = await Promise.all([
             supabaseClient.from('steps').select('*').eq('patient_id', uid).order('timestamp'),
             supabaseClient.from('sleep_sessions').select('*').eq('patient_id', uid).order('start_time')
         ]);
-
-        drawSteps(stepsRes.data || []);
-        drawSleep(sleepRes.data || []);
+        drawSteps(st.data || []);
+        drawSleep(sl.data || []);
     }
 
     function drawSteps(data) {
-        const ctx = document.getElementById('stepsChart').getContext('2d');
-        if (sChart) sChart.destroy();
-        sChart = new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: data.map(d => new Date(d.timestamp).getHours() + ":00"),
-                datasets: [{ label: 'Pasos', data: data.map(d => d.count), borderColor: '#1a73e8', tension: 0.4, fill: true, backgroundColor: 'rgba(26,115,232,0.1)' }]
-            },
-            options: { responsive: true, maintainAspectRatio: false }
-        });
+        const ctx = document.getElementById('stepsChart');
+        new Chart(ctx, { type: 'line', data: {
+            labels: data.map(d => new Date(d.timestamp).getHours() + ":00"),
+            datasets: [{ label: 'Pasos', data: data.map(d => d.count), borderColor: '#1a73e8' }]
+        }});
     }
 
     function drawSleep(data) {
-        const ctx = document.getElementById('sleepChart').getContext('2d');
-        if (slChart) slChart.destroy();
+        const ctx = document.getElementById('sleepChart');
         const toH = (iso) => new Date(iso).getHours() + (new Date(iso).getMinutes()/60);
-        slChart = new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: data.map(d => new Date(d.start_time).toLocaleDateString()),
-                datasets: [
-                    { label: 'Inicio', data: data.map(d => toH(d.start_time)), borderColor: '#34a853', backgroundColor: '#34a853' },
-                    { label: 'Fin', data: data.map(d => toH(d.end_time)), borderColor: '#ea4335', backgroundColor: '#ea4335' }
-                ]
-            },
-            options: { responsive: true, maintainAspectRatio: false, scales: { y: { min: 0, max: 24 } } }
-        });
+        new Chart(ctx, { type: 'line', data: {
+            labels: data.map(d => new Date(d.start_time).toLocaleDateString()),
+            datasets: [
+                { label: 'Inicio', data: data.map(d => toH(d.start_time)), borderColor: '#34a853' },
+                { label: 'Fin', data: data.map(d => toH(d.end_time)), borderColor: '#ea4335' }
+            ]
+        }, options: { scales: { y: { min: 0, max: 24 }}}});
     }
-
-    // Mantener sesión abierta si refresca
-    supabaseClient.auth.getSession().then(({ data: { session } }) => {
-        if (session) showDashboard();
-    });
 </script>
 </body>
 </html>
